@@ -36,7 +36,7 @@ export class MyProvider {
 Proton also provides two core lifecycle methods. These are optional. When Proton is started, all `protonInit` methods are called concurrently. Proton will yield itself until all `protonInit` methods have fully completed. If even one fails, Proton will stop and the error will be thrown. If all succeed, Proton will concurrently call all `protonStart` methods. Proton does not care if the `protonStart` methods ever stop, so they can run loops or yield indefinitely.
 
 ```ts
-import { ProtonInit, ProtonStart, Provider } from "shared/proton";
+import { ProtonInit, ProtonStart, Provider } from "@rbxts/proton";
 
 @Provider()
 export class MyProvider implements ProtonInit, ProtonStart {
@@ -54,7 +54,7 @@ export class MyProvider implements ProtonInit, ProtonStart {
 From both a server and client script, call the `Proton.start()` method. The method will yield until all `protonInit` methods have been completed and after all `protonStart` methods have been started.
 
 ```ts
-import { Proton } from "shared/proton";
+import { Proton } from "@rbxts/proton";
 
 Proton.start();
 ```
@@ -62,7 +62,7 @@ Proton.start();
 If another script requires Proton to be started, `Proton.awaitStart()` can be used, which will yield until Proton is fully started.
 
 ```ts
-import { Proton } from "shared/proton";
+import { Proton } from "@rbxts/proton";
 
 Proton.awaitStart();
 ```
@@ -71,7 +71,7 @@ Proton.awaitStart();
 Modules are not magically loaded. Thus, if your providers exist in their own modules but are never imported by any running code, then Proton will never see them and they will not start. This is common for top-level providers that no other code relies on. In such cases, they must be explicitly imported:
 
 ```ts
-import { Proton } from "shared/proton";
+import { Proton } from "@rbxts/proton";
 
 // e.g.
 import "./providers/my-provider.ts"
@@ -109,7 +109,7 @@ The recommended way to do networking in Proton is to create a `network.ts` file 
 
 ```ts
 // shared/network.ts
-import { NetEvent, NetEventType, NetFunction } from "./proton";
+import { NetEvent, NetEventType, NetFunction } from "@rbxts/proton";
 
 export namespace Network {
 	// Send a message to a player
@@ -167,7 +167,7 @@ Custom lifecycles can be added. At their core, lifecycles are just special event
 
 ```ts
 // shared/lifecycles.ts
-import { Lifecycle, LifecycleBehavior } from "./proton";
+import { Lifecycle, LifecycleBehavior } from "@rbxts/proton";
 
 export interface OnHeartbeat {
 	onHeartbeat(dt: number): void;

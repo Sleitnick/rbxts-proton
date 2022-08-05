@@ -1,27 +1,5 @@
 import { RunService } from "@rbxts/services";
 
-function awaitSeedAttr(): number {
-	let seed = script.GetAttribute("s");
-	while (seed === undefined) {
-		task.wait();
-		seed = script.GetAttribute("s");
-	}
-	script.SetAttribute("s", undefined);
-	return seed as number;
-}
-
-const seed = RunService.IsServer() ? DateTime.now().UnixTimestamp : awaitSeedAttr();
-
-let netFolder: Folder;
-if (RunService.IsServer()) {
-	netFolder = new Instance("Folder");
-	netFolder.Name = "ProtonNet";
-	netFolder.Parent = script;
-	script.SetAttribute("s", seed);
-} else {
-	netFolder = script.WaitForChild("ProtonNet") as Folder;
-}
-
 type NetworkParams<T> = Parameters<
 	T extends unknown[]
 		? (...args: T) => void
@@ -33,47 +11,6 @@ type NetworkParams<T> = Parameters<
 >;
 
 type NetworkReturn<T> = T extends [infer A] ? A : T extends unknown[] ? LuaTuple<T> : T;
-
-const networkNames = new Set<string>();
-
-function generateNetworkName(data: string): string {
-	const sum = data.byte(1, data.size()).reduce((accumulator, val) => accumulator + val);
-	const nameSeed = seed + sum;
-	const rng = new Random(nameSeed);
-	const nameArray: number[] = [];
-	for (let i = 0; i < 16; i++) {
-		nameArray.push(rng.NextInteger(33, 126));
-	}
-	let iter = 0;
-	const baseName = string.char(...nameArray);
-	let name = baseName;
-	while (networkNames.has(name)) {
-		name = `${baseName}${iter}`;
-		iter++;
-	}
-	networkNames.add(name);
-	return name;
-}
-
-function setupRemoteObject<T extends "RemoteEvent" | "RemoteFunction">(
-	className: T,
-	name?: string,
-): CreatableInstances[T] {
-	if (name === undefined || !RunService.IsStudio()) {
-		const [s, l] = debug.info(2, "sl");
-		name = generateNetworkName(`${s}${l}`);
-	}
-	name = `r/${name}`;
-	let remote: CreatableInstances[T];
-	if (RunService.IsServer()) {
-		remote = new Instance(className);
-		remote.Name = name;
-		remote.Parent = netFolder;
-	} else {
-		remote = netFolder.WaitForChild(name) as CreatableInstances[T];
-	}
-	return remote;
-}
 
 /**
  * NetEvent type.
@@ -130,6 +67,69 @@ type NetEventServerExposed<T extends unknown[] | unknown, B extends NetEventType
 	? INetEventServerFire<T>
 	: INetEventServerConnect<T>;
 
+function awaitSeedAttr(): number {
+	let seed = script.GetAttribute("s");
+	while (seed === undefined) {
+		task.wait();
+		seed = script.GetAttribute("s");
+	}
+	script.SetAttribute("s", undefined);
+	return seed as number;
+}
+
+const seed = RunService.IsServer() ? DateTime.now().UnixTimestamp : awaitSeedAttr();
+
+let netFolder: Folder;
+if (RunService.IsServer()) {
+	netFolder = new Instance("Folder");
+	netFolder.Name = "ProtonNet";
+	netFolder.Parent = script;
+	script.SetAttribute("s", seed);
+} else {
+	netFolder = script.WaitForChild("ProtonNet") as Folder;
+}
+
+const networkNames = new Set<string>();
+
+function generateNetworkName(data: string): string {
+	const sum = data.byte(1, data.size()).reduce((accumulator, val) => accumulator + val);
+	const nameSeed = seed + sum;
+	const rng = new Random(nameSeed);
+	const nameArray: number[] = [];
+	for (let i = 0; i < 16; i++) {
+		nameArray.push(rng.NextInteger(33, 126));
+	}
+	let iter = 0;
+	const baseName = string.char(...nameArray);
+	let name = baseName;
+	while (networkNames.has(name)) {
+		name = `${baseName}${iter}`;
+		iter++;
+	}
+	networkNames.add(name);
+	return name;
+}
+
+function setupRemoteObject<T extends "RemoteEvent" | "RemoteFunction">(
+	className: T,
+	name?: string,
+): CreatableInstances[T] {
+	if (name === undefined || !RunService.IsStudio()) {
+		const [s, l] = debug.info(2, "sl");
+		name = generateNetworkName(`${s}${l}`);
+	}
+	name = `r/${name}`;
+	let remote: CreatableInstances[T];
+	if (RunService.IsServer()) {
+		remote = new Instance(className);
+		remote.Name = name;
+		remote.Parent = netFolder;
+	} else {
+		remote = netFolder.WaitForChild(name) as CreatableInstances[T];
+	}
+	return remote;
+}
+
 class NetEventClient<T extends unknown[] | unknown> implements INetEventClient<T> {
 	constructor(private readonly re: RemoteEvent) {}
 	public fire(...args: NetworkParams<T>) {
@@ -153,6 +153,20 @@ class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T
 	}
 }
 
+class NetFunctionServer<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
+	constructor(private readonly rf: RemoteFunction) {}
+	public handle(handler: (player: Player, ...args: NetworkParams<TX>) => NetworkReturn<RX>) {
+		this.rf.OnServerInvoke = handler as (player: Player, ...args: unknown[]) => NetworkReturn<RX>;
+	}
+}
+
+class NetFunctionClient<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
+	constructor(private readonly rf: RemoteFunction) {}
+	public fire(...args: NetworkParams<TX>): NetworkReturn<RX> {
+		return this.rf.InvokeServer(...args);
+	}
+}
+
 /**
  * NetEvent represents a RemoteEvent.
  *
@@ -168,20 +182,6 @@ export class NetEvent<T extends unknown[] | unknown, B extends NetEventType = Ne
 		this.re = setupRemoteObject("RemoteEvent", name);
 		this.client = new NetEventClient(this.re);
 		this.server = new NetEventServer(this.re);
-	}
-}
-
-class NetFunctionServer<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
-	constructor(private readonly rf: RemoteFunction) {}
-	public handle(handler: (player: Player, ...args: NetworkParams<TX>) => NetworkReturn<RX>) {
-		this.rf.OnServerInvoke = handler as (player: Player, ...args: unknown[]) => NetworkReturn<RX>;
-	}
-}
-
-class NetFunctionClient<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
-	constructor(private readonly rf: RemoteFunction) {}
-	public fire(...args: NetworkParams<TX>): NetworkReturn<RX> {
-		return this.rf.InvokeServer(...args);
 	}
 }
 

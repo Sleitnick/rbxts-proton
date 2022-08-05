@@ -88,7 +88,7 @@ export class Lifecycle<T extends LifecycleCallback<T>> {
 	}
 
 	/**
-	 * Unregisters all callbacks.
+	 * Unregister all callbacks.
 	 */
 	unregisterAll(): void {
 		for (const callback of this.callbacks) {
