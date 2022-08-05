@@ -67,6 +67,18 @@ import { Proton } from "shared/proton";
 Proton.awaitStart();
 ```
 
+### Loading Providers
+Modules are not magically loaded. Thus, if your providers exist in their own modules but are never imported by any running code, then Proton will never see them and they will not start. This is common for top-level providers that no other code relies on. In such cases, they must be explicitly imported:
+
+```ts
+import { Proton } from "shared/proton";
+
+// e.g.
+import "./providers/my-provider.ts"
+
+Proton.start();
+```
+
 ## Getting a Provider
 
 Once Proton is started, use `Proton.get()` to get a provider:
