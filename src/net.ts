@@ -75,9 +75,23 @@ function setupRemoteObject<T extends "RemoteEvent" | "RemoteFunction">(
 	return remote;
 }
 
-export enum NetEventBehavior {
+/**
+ * NetEvent type.
+ */
+export enum NetEventType {
+	/**
+	 * NetEvent can send and receive from both the server and the client.
+	 */
 	TwoWay,
+
+	/**
+	 * NetEvent can send from the server and receive on the client.
+	 */
 	ServerToClient,
+
+	/**
+	 * NetEvent can send from the client and receive on the server.
+	 */
 	ClientToServer,
 }
 
@@ -91,10 +105,10 @@ interface INetEventClientConnect<T extends unknown[] | unknown> {
 
 type INetEventClient<T extends unknown[] | unknown> = INetEventClientFire<T> & INetEventClientConnect<T>;
 
-type NetEventClientExposed<T extends unknown[] | unknown, B extends NetEventBehavior> = INetEventClient<T> &
-	B extends NetEventBehavior.TwoWay
+type NetEventClientExposed<T extends unknown[] | unknown, B extends NetEventType> = INetEventClient<T> &
+	B extends NetEventType.TwoWay
 	? INetEventClient<T>
-	: B extends NetEventBehavior.ServerToClient
+	: B extends NetEventType.ServerToClient
 	? INetEventClientConnect<T>
 	: INetEventClientFire<T>;
 
@@ -109,10 +123,10 @@ interface INetEventServerConnect<T extends unknown[] | unknown> {
 
 type INetEventServer<T extends unknown[] | unknown> = INetEventServerFire<T> & INetEventServerConnect<T>;
 
-type NetEventServerExposed<T extends unknown[] | unknown, B extends NetEventBehavior> = INetEventServer<T> &
-	B extends NetEventBehavior.TwoWay
+type NetEventServerExposed<T extends unknown[] | unknown, B extends NetEventType> = INetEventServer<T> &
+	B extends NetEventType.TwoWay
 	? INetEventServer<T>
-	: B extends NetEventBehavior.ServerToClient
+	: B extends NetEventType.ServerToClient
 	? INetEventServerFire<T>
 	: INetEventServerConnect<T>;
 
@@ -139,7 +153,14 @@ class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T
 	}
 }
 
-export class NetEvent<T extends unknown[] | unknown, B extends NetEventBehavior = NetEventBehavior.TwoWay> {
+/**
+ * NetEvent represents a RemoteEvent.
+ *
+ * ```ts
+ * export const MyEvent = new NetEvent<[message: string]>();
+ * ```
+ */
+export class NetEvent<T extends unknown[] | unknown, B extends NetEventType = NetEventType.TwoWay> {
 	private readonly re: RemoteEvent;
 	public readonly client: NetEventClientExposed<T, B>;
 	public readonly server: NetEventServerExposed<T, B>;
@@ -164,6 +185,13 @@ class NetFunctionClient<TX extends unknown[] | unknown, RX extends unknown[] | u
 	}
 }
 
+/**
+ * NetFunction represents a RemoteFunction.
+ *
+ * ```ts
+ * export const MyFunc = new NetFunction<void, [message: string]>();
+ * ```
+ */
 export class NetFunction<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
 	private readonly rf: RemoteFunction;
 	public readonly server: NetFunctionServer<TX, RX>;

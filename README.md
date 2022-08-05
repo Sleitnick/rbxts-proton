@@ -109,14 +109,14 @@ The recommended way to do networking in Proton is to create a `network.ts` file 
 
 ```ts
 // shared/network.ts
-import { NetEvent, NetEventBehavior, NetFunction } from "./proton";
+import { NetEvent, NetEventType, NetFunction } from "./proton";
 
 export namespace Network {
 	// Send a message to a player
-	export const sendMessageToPlayer = new NetEvent<[message: string], NetEventBehavior.ServerToClient>();
+	export const sendMessageToPlayer = new NetEvent<[message: string], NetEventType.ServerToClient>();
 
 	// Get fireBullet from player
-	export const fireBullet = new NetEvent<[pos: Vector3, dir: Vector3], NetEventBehavior.ClientToServer>();
+	export const fireBullet = new NetEvent<[pos: Vector3, dir: Vector3], NetEventType.ClientToServer>();
 
 	// Allow client to fetch some data
 	export const getData = new NetFunction<void, [data: string]>();
@@ -173,7 +173,7 @@ export interface OnHeartbeat {
 	onHeartbeat(dt: number): void;
 }
 
-export const HeartbeatLifecycle = new Lifecycle<OnHeartbeat["onHeartbeat"]>(LifecycleBehavior.Concurrent);
+export const HeartbeatLifecycle = new Lifecycle<OnHeartbeat["onHeartbeat"]>();
 
 RunService.Heartbeat.Connect((dt) => heartbeat.fire(dt));
 ```
@@ -198,7 +198,7 @@ export interface OnPlayerAdded {
 	onPlayerAdded(player: Player): void;
 }
 
-export const PlayerAddedLifecycle = new Lifecycle<OnPlayerAdded["onPlayerAdded"]>(LifecycleBehavior.Concurrent);
+export const PlayerAddedLifecycle = new Lifecycle<OnPlayerAdded["onPlayerAdded"]>();
 
 // Trigger lifecycle for all current players and all future players:
 Players.PlayerAdded.Connect((player) => playerAdded.fire(player));
