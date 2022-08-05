@@ -1,5 +1,8 @@
 # Proton
 
+[![Lint](https://github.com/Sleitnick/rbxts-proton/actions/workflows/lint.yaml/badge.svg)](https://github.com/Sleitnick/rbxts-proton/actions/workflows/lint.yaml)
+[![Release](https://github.com/Sleitnick/rbxts-proton/actions/workflows/release.yaml/badge.svg)](https://github.com/Sleitnick/rbxts-proton/actions/workflows/release.yaml)
+
 Proton is an easy-to-use framework for Roblox game development.
 
 Like the proton of an atom, Proton aims at adding stability to your game development, all while only remaining a portion of the whole. Use Proton to structure and connect the top-level design of your game.
