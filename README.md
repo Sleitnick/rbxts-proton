@@ -20,7 +20,7 @@ export class MyProvider {}
 That's it. The `@Provider()` decorator communicates data about the class to Proton, but does _not_ mutate the given provider at all. Proton will create a singleton of the provider once Proton is started.
 
 ### Extensible
-Providers can have any number of methods or fields added to them. Again, they're just plain classes. Add anything to them.
+Providers can have any number of methods or fields added to them. They're just plain classes. Add anything to them.
 
 ```ts
 @Provider()
