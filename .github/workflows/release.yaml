@@ -38,16 +38,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install roblox-ts
-        run: npm i -g roblox-ts
+        run: npm i roblox-ts --location=global
       - name: Publish project
         run: npm publish
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Build for archive
+        run: npm run build
       - name: Create archive
         shell: bash
         run: |
           mkdir release
-          cp -R out release
+          cp -a out/. release/
           cd release
           zip ../release.zip
       - name: Upload Archive to Release
