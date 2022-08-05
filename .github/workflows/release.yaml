@@ -37,6 +37,8 @@ jobs:
           node-version: 16
       - name: Install dependencies
         run: npm ci
+      - name: Install roblox-ts
+        run: npm i -g roblox-ts
       - name: Publish project
         run: npm publish
         env:
