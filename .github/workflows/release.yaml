@@ -24,6 +24,7 @@ jobs:
           prerelease: false
 
   lint:
+    name: Lint
     uses: ./.github/workflows/lint.yaml
 
   npm-publish:
