@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  lint:
+    uses: ./.github/workflows/lint.yaml
+
+  npm-publish:
+    needs: ["github-release", "lint"]
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Install dependencies
+        run: npm ci
+      - name: Publish project
+        run: npm publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create archive
+        shell: bash
+        run: |
+          mkdir release
+          cp -R out release
+          cd release
+          zip ../release.zip
+      - name: Upload Archive to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.github-release.outputs.upload_url }}
+          asset_path: release.zip
+          asset_name: release.zip
+          asset_content_type: application/octet-stream
+      - name: Upload Archive to Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release.zip
+          path: release.zip
