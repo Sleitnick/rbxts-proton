@@ -29,21 +29,29 @@ Providers can have any number of methods or fields added to them. They're just p
 @Provider()
 export class MyProvider {
 	private message = "hello!";
+
+	// Optional constructor method
+	constructor() {
+		// Use the constructor to set up any necessary functionality
+		// for the provider (e.g. hooking up network connections).
+	}
+
+	// Custom method
 	helloWorld() {
 		print(this.message);
 	}
 }
 ```
 
-### Built-in Lifecycles
-Proton also provides two core lifecycle methods. These are optional. When Proton is started, all `protonInit` methods are called concurrently. Proton will yield itself until all `protonInit` methods have fully completed. If even one fails, Proton will stop and the error will be thrown. If all succeed, Proton will concurrently call all `protonStart` methods. Proton does not care if the `protonStart` methods ever stop, so they can run loops or yield indefinitely.
+### Built-in Start Lifecycle
+Proton includes an optional built-in lifecycle method `protonStart`, which is called when Proton is started. All `protonStart` methods are called at the same time using `task.spawn`, which means that these methods can yield without blocking other providers from starting. It is common practice to use `protonStart` as a place to have long-running loops (e.g. a system that drives map loading and rotation every round).
 
 ```ts
-import { ProtonInit, ProtonStart, Provider } from "@rbxts/proton";
+import { ProtonStart, Provider } from "@rbxts/proton";
 
 @Provider()
-export class MyProvider implements ProtonInit, ProtonStart {
-	protonInit() {
+export class MyProvider implements ProtonStart {
+	constructor() {
 		print("MyProvider initialized");
 	}
 	protonStart() {
@@ -54,7 +62,7 @@ export class MyProvider implements ProtonInit, ProtonStart {
 
 ## Starting Proton
 
-From both a server and client script, call the `Proton.start()` method. The method will yield until all `protonInit` methods have been completed and after all `protonStart` methods have been started.
+From both a server and client script, call the `Proton.start()` method.
 
 ```ts
 import { Proton } from "@rbxts/proton";
@@ -95,12 +103,10 @@ Providers can also access other providers:
 
 ```ts
 @Provider()
-export class AnotherProvider implements ProtonStart {
+export class AnotherProvider {
 	private readonly myProvider = Proton.get(MyProvider);
 
-	protonStart() {
-		// Other providers are safe to use once the
-		// `protonStart` stage is reached.
+	constructor() {
 		myProvider.helloWorld();
 	}
 }

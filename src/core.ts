@@ -1,30 +1,17 @@
-export interface ProtonInit {
-	/**
-	 * Proton lifecycle method. `protonInit` is fired
-	 * when `Proton.start()` is called. All providers
-	 * will run their `protonInit` methods concurrently.
-	 *
-	 * If an error is thrown in `protonInit`, Proton
-	 * will stop.
-	 */
-	protonInit(): void;
-}
-
 export interface ProtonStart {
 	/**
 	 * Proton lifecycle method. `protonStart` is fired
-	 * _after_ all `protonInit` methods have finished
-	 * executing. All providers will run their `protonStart`
-	 * methods concurrently. Proton fire-and-forgets
-	 * this method, so it is safe to yield indefinitely or
-	 * loop forever.
+	 * when Proton is started. All `protonStart` methods
+	 * are fired in their own threads using `task.spawn`
+	 * internally. This also means that these methods
+	 * do not need to return at any point (e.g. they can
+	 * run loops forever without blocking other providers).
 	 */
 	protonStart(): void;
 }
 
 const providerClasses = new Map<new () => unknown, unknown>();
 
-let starting = false;
 let started = false;
 const awaitStartThreads: thread[] = [];
 
@@ -33,7 +20,7 @@ const awaitStartThreads: thread[] = [];
  */
 export function Provider() {
 	return <T extends new () => InstanceType<T>>(providerClass: T) => {
-		if (starting || started) {
+		if (started) {
 			error("[Proton]: Cannot create provider after Proton has started", 2);
 		}
 		providerClasses.set(providerClass, new providerClass());
@@ -60,33 +47,7 @@ export namespace Proton {
 	 * ```
 	 */
 	export function start() {
-		if (starting || started) return;
-		starting = true;
-		const thread = coroutine.running();
-
-		// Init providers:
-		let numInitProviders = 0;
-		let completedInit = 0;
-		for (const [providerClass, provider] of providerClasses) {
-			const p = provider as object;
-			if ("protonInit" in p) {
-				numInitProviders++;
-				task.spawn(() => {
-					debug.setmemorycategory(tostring(providerClass));
-					(p as ProtonInit).protonInit();
-					debug.resetmemorycategory();
-					completedInit++;
-					if (completedInit === numInitProviders && coroutine.status(thread) === "suspended") {
-						task.spawn(thread);
-					}
-				});
-			}
-		}
-
-		// Wait for init step to be completed:
-		if (completedInit !== numInitProviders) {
-			coroutine.yield();
-		}
+		if (started) return;
 
 		// Start providers:
 		for (const [providerClass, provider] of providerClasses) {
@@ -99,7 +60,6 @@ export namespace Proton {
 			}
 		}
 
-		starting = false;
 		started = true;
 
 		for (const awaitThread of awaitStartThreads) {
@@ -111,11 +71,6 @@ export namespace Proton {
 	/**
 	 * Yields the calling thread until Proton has been
 	 * fully started.
-	 *
-	 * When accessing providers outside of any other
-	 * provider, it is good practice to ensure that
-	 * Proton is fully started, which ensures that the
-	 * providers have been fully initialized.
 	 *
 	 * ```ts
 	 * Proton.awaitStart();
