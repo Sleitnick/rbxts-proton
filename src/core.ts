@@ -1,19 +1,11 @@
-export interface ProtonStart {
-	/**
-	 * Proton lifecycle method. `protonStart` is fired
-	 * when Proton is started. All `protonStart` methods
-	 * are fired in their own threads using `task.spawn`
-	 * internally. This also means that these methods
-	 * do not need to return at any point (e.g. they can
-	 * run loops forever without blocking other providers).
-	 */
-	protonStart(): void;
-}
+import { LifecycleBehavior, ProtonLifecycle } from "./lifecycle";
 
 const providerClasses = new Map<new () => unknown, unknown>();
 
 let started = false;
 const awaitStartThreads: thread[] = [];
+
+export const ProtonStart = new ProtonLifecycle<() => void>(LifecycleBehavior.Concurrent);
 
 /**
  * Provider decorator.
@@ -34,34 +26,18 @@ export namespace Proton {
 	 * the client). Attempts to call this more than once
 	 * will throw an error.
 	 *
-	 * Yields until all providers have been initialized
-	 * and started.
-	 *
-	 * If a provider's `protonInit` method throws an error,
-	 * then the whole startup process will be aborted.
+	 * If any providers yield within their constructors,
+	 * then this method will also yield.
 	 *
 	 * ```ts
-	 * print("Starting...");
 	 * Proton.start();
 	 * print("Proton started");
 	 * ```
 	 */
 	export function start() {
 		if (started) return;
-
-		// Start providers:
-		for (const [providerClass, provider] of providerClasses) {
-			const p = provider as object;
-			if ("protonStart" in p) {
-				task.spawn(() => {
-					debug.setmemorycategory(tostring(providerClass));
-					(p as ProtonStart).protonStart();
-				});
-			}
-		}
-
+		ProtonStart.fire();
 		started = true;
-
 		for (const awaitThread of awaitStartThreads) {
 			task.spawn(awaitThread);
 		}

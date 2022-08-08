@@ -44,17 +44,19 @@ export class MyProvider {
 ```
 
 ### Built-in Start Lifecycle
-Proton includes an optional built-in lifecycle method `protonStart`, which is called when Proton is started. All `protonStart` methods are called at the same time using `task.spawn`, which means that these methods can yield without blocking other providers from starting. It is common practice to use `protonStart` as a place to have long-running loops (e.g. a system that drives map loading and rotation every round).
+Proton includes an optional built-in lifecycle method `ProtonStart`, which is fired when Proton is started. All `ProtonStart` lifecycle methods are called at the same time using `task.spawn`, which means that these methods can yield without blocking other providers from starting. It is common practice to use `ProtonStart` as a place to have long-running loops (e.g. a system that drives map loading and rotation every round).
 
 ```ts
-import { ProtonStart, Provider } from "@rbxts/proton";
+import { Lifecycle, ProtonStart, Provider } from "@rbxts/proton";
 
 @Provider()
-export class MyProvider implements ProtonStart {
+export class MyProvider {
 	constructor() {
 		print("MyProvider initialized");
 	}
-	protonStart() {
+
+	@Lifecycle(ProtonStart)
+	onStart() {
 		print("MyProvider started");
 	}
 }
@@ -176,13 +178,13 @@ Custom lifecycles can be added. At their core, lifecycles are just special event
 
 ```ts
 // shared/lifecycles.ts
-import { Lifecycle, LifecycleBehavior } from "@rbxts/proton";
+import { ProtonLifecycle } from "@rbxts/proton";
 
 export interface OnHeartbeat {
 	onHeartbeat(dt: number): void;
 }
 
-export const HeartbeatLifecycle = new Lifecycle<OnHeartbeat["onHeartbeat"]>();
+export const HeartbeatLifecycle = new ProtonLifecycle<OnHeartbeat["onHeartbeat"]>();
 
 RunService.Heartbeat.Connect((dt) => heartbeat.fire(dt));
 ```
@@ -190,9 +192,11 @@ RunService.Heartbeat.Connect((dt) => heartbeat.fire(dt));
 A provider can then hook into the lifecycle:
 
 ```ts
+import { Provider, Lifecycle } from "@rbxts/proton";
+
 @Provider()
 export class MyProvider implements OnHeartbeat {
-	@OnLifecycle(HeartbeatLifecycle)
+	@Lifecycle(HeartbeatLifecycle)
 	onHeartbeat(dt: number) {
 		print("Update", dt);
 	}
@@ -207,7 +211,7 @@ export interface OnPlayerAdded {
 	onPlayerAdded(player: Player): void;
 }
 
-export const PlayerAddedLifecycle = new Lifecycle<OnPlayerAdded["onPlayerAdded"]>();
+export const PlayerAddedLifecycle = new ProtonLifecycle<OnPlayerAdded["onPlayerAdded"]>();
 
 // Trigger lifecycle for all current players and all future players:
 Players.PlayerAdded.Connect((player) => playerAdded.fire(player));
@@ -226,9 +230,21 @@ playerAdded.onRegistered((callback) => {
 ```ts
 @Provider()
 export class MyProvider implements OnPlayerAdded {
-	@OnLifecycle(PlayerAddedLifecycle)
+	@Lifecycle(PlayerAddedLifecycle)
 	onPlayerAdded(player: Player) {
 		print(`Player entered the game: ${player}`);
 	}
+}
+```
+
+Having the `OnPlayerAdded` interface just helps to keep explicit typings across consumers of the lifecycle. However, it is not entirely necessary. The above example could also have a lifecycle definition and consumer look like such:
+
+```ts
+export const PlayerAddedLifecycle = new ProtonLifecycle<(player: Player) => void>();
+
+@Provider
+export class MyProvider {
+	@Lifecycle(PlayerAddedLifecycle)
+	onPlayerAdded(player: Player) {}
 }
 ```

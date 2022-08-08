@@ -17,11 +17,16 @@ export enum LifecycleBehavior {
 	Concurrent,
 }
 
+interface CallbackItem<T extends LifecycleCallback<T>> {
+	callback: T;
+	memoryCategory: string;
+}
+
 /**
  * Custom lifecycle for Proton providers.
  */
-export class Lifecycle<T extends LifecycleCallback<T>> {
-	private callbacks: T[] = [];
+export class ProtonLifecycle<T extends LifecycleCallback<T>> {
+	private callbacks: CallbackItem<T>[] = [];
 	private onRegisteredCallbacks: ((c: T) => void)[] = [];
 	private onUnregisteredCallbacks: ((c: T) => void)[] = [];
 
@@ -48,13 +53,18 @@ export class Lifecycle<T extends LifecycleCallback<T>> {
 
 	private fireConcurrent(...args: Parameters<T>): void {
 		for (const callback of this.callbacks) {
-			task.spawn(callback, ...args);
+			task.spawn(() => {
+				debug.setmemorycategory(callback.memoryCategory);
+				callback.callback(...args);
+			});
 		}
 	}
 
 	private fireSeries(...args: Parameters<T>): void {
 		for (const callback of this.callbacks) {
-			callback(...args);
+			debug.setmemorycategory(callback.memoryCategory);
+			callback.callback(...args);
+			debug.resetmemorycategory();
 		}
 	}
 
@@ -68,9 +78,10 @@ export class Lifecycle<T extends LifecycleCallback<T>> {
 	 * Register a lifecycle. This is usually only called from
 	 * the `@OnLifecycle` decorator.
 	 * @param callback Callback
+	 * @param memoryCategory Memory category
 	 */
-	register(callback: T): void {
-		this.callbacks.push(callback);
+	register(callback: T, memoryCategory: string): void {
+		this.callbacks.push({ callback, memoryCategory });
 		for (const onRegistered of this.onRegisteredCallbacks) {
 			onRegistered(callback);
 		}
@@ -81,7 +92,7 @@ export class Lifecycle<T extends LifecycleCallback<T>> {
 	 * @param callback Callback to unregister
 	 */
 	unregister(callback: T): void {
-		const index = this.callbacks.indexOf(callback);
+		const index = this.callbacks.findIndex((item) => item.callback === callback);
 		if (index === -1) return;
 		this.callbacks.unorderedRemove(index);
 		this.callOnUnregisteredCallbacks(callback);
@@ -92,7 +103,7 @@ export class Lifecycle<T extends LifecycleCallback<T>> {
 	 */
 	unregisterAll(): void {
 		for (const callback of this.callbacks) {
-			this.callOnUnregisteredCallbacks(callback);
+			this.callOnUnregisteredCallbacks(callback.callback);
 		}
 		this.callbacks.clear();
 	}
@@ -130,14 +141,17 @@ export class Lifecycle<T extends LifecycleCallback<T>> {
  * OnLifecycle decorator.
  * @param lifecycle Attached lifecycle
  */
-export function OnLifecycle<T extends LifecycleCallback<T>>(lifecycle: Lifecycle<T>) {
+export function Lifecycle<T extends LifecycleCallback<T>>(lifecycle: ProtonLifecycle<T>) {
 	return (
 		target: InferThis<(this: defined, ...args: Parameters<T>) => void>,
 		property: string,
 		descriptor: TypedPropertyDescriptor<(this: defined, ...args: Parameters<T>) => void>,
 	) => {
-		lifecycle.register(((...args: Parameters<T>) => {
-			descriptor.value(target, ...args);
-		}) as T);
+		lifecycle.register(
+			((...args: Parameters<T>) => {
+				descriptor.value(target, ...args);
+			}) as T,
+			tostring(target),
+		);
 	};
 }
