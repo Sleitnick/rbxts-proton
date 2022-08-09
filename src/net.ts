@@ -64,7 +64,7 @@ interface INetEventServerFire<T extends unknown[] | unknown> {
 	 * @param player Client(s)
 	 * @param args Arguments
 	 */
-	fire(player: Player, ...args: NetworkParams<T>): void;
+	fire(player: Player | Player[], ...args: NetworkParams<T>): void;
 
 	/**
 	 * Fire the event to all clients with the given arguments.
