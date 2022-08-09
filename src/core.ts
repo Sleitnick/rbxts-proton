@@ -1,11 +1,8 @@
-import { LifecycleBehavior, ProtonLifecycle } from "./lifecycle";
-
 const providerClasses = new Map<new () => unknown, unknown>();
 
 let started = false;
 const awaitStartThreads: thread[] = [];
-
-export const ProtonStart = new ProtonLifecycle<() => void>(LifecycleBehavior.Concurrent);
+const awaitCallbacks: (() => void)[] = [];
 
 /**
  * Provider decorator.
@@ -36,8 +33,10 @@ export namespace Proton {
 	 */
 	export function start() {
 		if (started) return;
-		ProtonStart.fire();
 		started = true;
+		for (const callback of awaitCallbacks) {
+			task.spawn(callback);
+		}
 		for (const awaitThread of awaitStartThreads) {
 			task.spawn(awaitThread);
 		}
@@ -60,6 +59,20 @@ export namespace Proton {
 		const thread = coroutine.running();
 		awaitStartThreads.push(thread);
 		coroutine.yield();
+	}
+
+	/**
+	 * Calls the callback once Proton has fully started.
+	 * If Proton is already started, the callback will
+	 * be spawned immediately.
+	 * @param callback Callback
+	 */
+	export function onStart(callback: () => void) {
+		if (started) {
+			task.spawn(callback);
+			return;
+		}
+		awaitCallbacks.push(callback);
 	}
 
 	/**

@@ -1,6 +1,6 @@
 {
   "name": "@rbxts/proton",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "description": "Framework for Roblox game development",
   "main": "out/init.lua",
   "scripts": {

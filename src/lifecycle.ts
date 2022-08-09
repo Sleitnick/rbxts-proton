@@ -1,4 +1,4 @@
-import { Proton, ProtonStart, Provider } from "./core";
+import { Proton } from "./core";
 
 type LifecycleCallback<T> = (...args: Parameters<T>) => void;
 
@@ -160,3 +160,6 @@ export function Lifecycle<T extends LifecycleCallback<T>>(lifecycle: ProtonLifec
 		);
 	};
 }
+
+export const ProtonStart = new ProtonLifecycle<() => void>(LifecycleBehavior.Concurrent);
+Proton.onStart(() => ProtonStart.fire());
