@@ -1,4 +1,4 @@
-import { RunService } from "@rbxts/services";
+import { Players, RunService } from "@rbxts/services";
 
 type NetworkParams<T> = Parameters<
 	T extends unknown[]
@@ -132,9 +132,20 @@ function setupRemoteObject<T extends "RemoteEvent" | "RemoteFunction">(
 
 class NetEventClient<T extends unknown[] | unknown> implements INetEventClient<T> {
 	constructor(private readonly re: RemoteEvent) {}
+
+	/**
+	 * Fire the event to the server with the given arguments.
+	 * @param args Arguments
+	 */
 	public fire(...args: NetworkParams<T>) {
 		this.re.FireServer(...args);
 	}
+
+	/**
+	 * Listen to events coming from the server.
+	 * @param handler Handle the event
+	 * @returns RBXScriptConnection
+	 */
 	public connect(handler: (...args: NetworkParams<T>) => void): RBXScriptConnection {
 		return this.re.OnClientEvent.Connect(handler);
 	}
@@ -142,12 +153,66 @@ class NetEventClient<T extends unknown[] | unknown> implements INetEventClient<T
 
 class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T> {
 	constructor(private readonly re: RemoteEvent) {}
+
+	/**
+	 * Fire the event to all clients with the given arguments.
+	 * @param args Arguments
+	 */
 	public fireAll(...args: NetworkParams<T>) {
 		this.re.FireAllClients(...args);
 	}
-	public fire(player: Player, ...args: NetworkParams<T>) {
-		this.re.FireClient(player, ...args);
+
+	/**
+	 * Fire the event to the given client(s) with the arguments.
+	 * @param player Client(s)
+	 * @param args Arguments
+	 */
+	public fire(player: Player | Player[], ...args: NetworkParams<T>) {
+		if (typeOf(player) === "table") {
+			for (const plr of player as Player[]) {
+				this.re.FireClient(plr, ...args);
+			}
+		} else {
+			this.re.FireClient(player as Player, ...args);
+		}
 	}
+
+	/**
+	 * Fire the event to all clients _except_ the given client(s).
+	 * @param exceptPlayer Client(s) to ignore
+	 * @param args Arguments
+	 */
+	public fireExcept(exceptPlayer: Player | Player[], ...args: NetworkParams<T>) {
+		if (typeOf(exceptPlayer) === "table") {
+			for (const player of Players.GetPlayers()) {
+				if ((exceptPlayer as Player[]).includes(player)) continue;
+				this.re.FireClient(player, ...args);
+			}
+		} else {
+			for (const player of Players.GetPlayers()) {
+				if (player === exceptPlayer) continue;
+				this.re.FireClient(player, ...args);
+			}
+		}
+	}
+
+	/**
+	 * Fire the event to each client given the predicate for each client returns `true`.
+	 * @param predicate Predicate function to test if the event should be fired to the given client
+	 * @param args Arguments
+	 */
+	public fireIf(predicate: (player: Player) => boolean, ...args: NetworkParams<T>) {
+		for (const player of Players.GetPlayers()) {
+			if (!predicate(player)) continue;
+			this.re.FireClient(player, ...args);
+		}
+	}
+
+	/**
+	 * Listen to events coming from all clients.
+	 * @param handler Handle the event
+	 * @returns RBXScriptConnection
+	 */
 	public connect(handler: (player: Player, ...args: NetworkParams<T>) => void): RBXScriptConnection {
 		return this.re.OnServerEvent.Connect(handler as (player: Player, ...args: unknown[]) => void);
 	}
@@ -155,6 +220,11 @@ class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T
 
 class NetFunctionServer<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
 	constructor(private readonly rf: RemoteFunction) {}
+
+	/**
+	 * Handle invocations to this remote function coming from clients.
+	 * @param handler Handler
+	 */
 	public handle(handler: (player: Player, ...args: NetworkParams<TX>) => NetworkReturn<RX>) {
 		this.rf.OnServerInvoke = handler as (player: Player, ...args: unknown[]) => NetworkReturn<RX>;
 	}
@@ -162,7 +232,13 @@ class NetFunctionServer<TX extends unknown[] | unknown, RX extends unknown[] | u
 
 class NetFunctionClient<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
 	constructor(private readonly rf: RemoteFunction) {}
-	public fire(...args: NetworkParams<TX>): NetworkReturn<RX> {
+
+	/**
+	 * Invoke the remote function, sending the arguments to the server.
+	 * @param args TX
+	 * @returns RX
+	 */
+	public invoke(...args: NetworkParams<TX>): NetworkReturn<RX> {
 		return this.rf.InvokeServer(...args);
 	}
 }
@@ -176,8 +252,17 @@ class NetFunctionClient<TX extends unknown[] | unknown, RX extends unknown[] | u
  */
 export class NetEvent<T extends unknown[] | unknown, B extends NetEventType = NetEventType.TwoWay> {
 	private readonly re: RemoteEvent;
-	public readonly client: NetEventClientExposed<T, B>;
+
+	/**
+	 * Server API for the event. Should only be used from the server.
+	 */
 	public readonly server: NetEventServerExposed<T, B>;
+
+	/**
+	 * Client API for the event. Should only be used from the client.
+	 */
+	public readonly client: NetEventClientExposed<T, B>;
+
 	constructor(name?: string) {
 		this.re = setupRemoteObject("RemoteEvent", name);
 		this.client = new NetEventClient(this.re);
@@ -194,8 +279,17 @@ export class NetEvent<T extends unknown[] | unknown, B extends NetEventType = Ne
  */
 export class NetFunction<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
 	private readonly rf: RemoteFunction;
+
+	/**
+	 * Server API for the function. Should only be used from the server.
+	 */
 	public readonly server: NetFunctionServer<TX, RX>;
+
+	/**
+	 * Client API for the function. Should only be used from the client.
+	 */
 	public readonly client: NetFunctionClient<TX, RX>;
+
 	constructor(name?: string) {
 		this.rf = setupRemoteObject("RemoteFunction", name);
 		this.server = new NetFunctionServer(this.rf);
