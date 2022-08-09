@@ -243,7 +243,7 @@ class NetFunctionClient<TX extends unknown[] | unknown, RX extends unknown[] | u
 	 * @param args TX
 	 * @returns RX
 	 */
-	public invoke(...args: NetworkParams<TX>): NetworkReturn<RX> {
+	public async invoke(...args: NetworkParams<TX>): Promise<NetworkReturn<RX>> {
 		return this.rf.InvokeServer(...args);
 	}
 }
