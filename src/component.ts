@@ -4,7 +4,7 @@ export interface ComponentConfig {
 	/**
 	 * CollectionService tag.
 	 */
-	tag: string;
+	tag?: string;
 
 	/**
 	 * Descendant whitelist. Component will only be active
@@ -61,6 +61,141 @@ export abstract class BaseComponent<I extends Instance = Instance> {
 	abstract onStop(): void;
 }
 
+class ComponentRunner {
+	private readonly compInstances = new Map<
+		Instance,
+		{ comp: BaseComponent; started: boolean; connections: RBXScriptConnection[] }
+	>();
+	private readonly addQueue = new Map<Instance, thread>();
+
+	constructor(private readonly config: ComponentConfig, private readonly componentClass: new () => BaseComponent) {
+		if (config.tag !== undefined) {
+			CollectionService.GetInstanceAddedSignal(config.tag).Connect((instance) =>
+				this.queueOnInstanceAdded(instance),
+			);
+			CollectionService.GetInstanceRemovedSignal(config.tag).Connect((instance) =>
+				this.onInstanceRemoved(instance),
+			);
+			for (const instance of CollectionService.GetTagged(config.tag)) {
+				task.spawn(() => this.queueOnInstanceAdded(instance));
+			}
+		}
+	}
+
+	private checkParent(instance: Instance): boolean {
+		if (this.config.blacklistDescendants !== undefined) {
+			for (const descendant of this.config.blacklistDescendants) {
+				if (instance.IsDescendantOf(descendant)) {
+					return false;
+				}
+			}
+		}
+		if (this.config.whitelistDescendants !== undefined) {
+			for (const descendant of this.config.whitelistDescendants) {
+				if (instance.IsDescendantOf(descendant)) {
+					return true;
+				}
+			}
+			return false;
+		}
+		return true;
+	}
+
+	private onInstanceAdded(instance: Instance) {
+		const comp = new this.componentClass();
+		comp.instance = instance;
+		comp.tag = this.config.tag ?? "";
+		const compItem = { comp, started: false, connections: new Array<RBXScriptConnection>() };
+		this.compInstances.set(instance, compItem);
+		if (this.checkParent(instance)) {
+			compItem.started = true;
+			task.spawn(() => comp.onStart());
+		}
+		if (this.config.whitelistDescendants !== undefined || this.config.blacklistDescendants !== undefined) {
+			const ancestryConnection = instance.AncestryChanged.Connect((_, parent) => {
+				if (parent === undefined) return;
+				if (this.checkParent(instance)) {
+					if (!compItem.started) {
+						compItem.started = true;
+						task.spawn(() => comp.onStart());
+					}
+				} else {
+					if (compItem.started) {
+						compItem.started = false;
+						task.spawn(() => comp.onStop());
+					}
+				}
+			});
+			compItem.connections.push(ancestryConnection);
+		}
+		this.addQueue.delete(instance);
+	}
+
+	private queueOnInstanceAdded(instance: Instance) {
+		if (this.addQueue.has(instance) || this.compInstances.has(instance)) return;
+		this.addQueue.set(
+			instance,
+			task.defer(() => this.onInstanceAdded(instance)),
+		);
+	}
+
+	private onInstanceRemoved(instance: Instance) {
+		if (this.addQueue.has(instance)) {
+			task.cancel(this.addQueue.get(instance)!);
+			this.addQueue.delete(instance);
+		}
+		const compItem = this.compInstances.get(instance);
+		if (compItem !== undefined) {
+			this.compInstances.delete(instance);
+			if (compItem.started) {
+				task.spawn(() => compItem.comp.onStop());
+			}
+			for (const connection of compItem.connections) {
+				connection.Disconnect();
+			}
+		}
+	}
+
+	getFromInstance(instance: Instance) {
+		const compItem = this.compInstances.get(instance);
+		if (compItem !== undefined && compItem.started) {
+			return compItem.comp;
+		}
+		return undefined;
+	}
+
+	forceSpawn(instance: Instance) {
+		if (this.config.tag !== undefined) {
+			error("[Proton]: Component with a configured tag cannot be spawned", 2);
+		}
+		this.queueOnInstanceAdded(instance);
+	}
+
+	forceDespawn(instance: Instance) {
+		if (this.config.tag !== undefined) {
+			error("[Proton]: Component with a configured tag cannot be despawned", 2);
+		}
+		this.onInstanceRemoved(instance);
+	}
+}
+
+/**
+ * Component decorator.
+ * @param config Component configuration
+ */
+export function Component(config: ComponentConfig) {
+	return <B extends new () => BaseComponent>(componentClass: B) => {
+		if (config.tag !== undefined && usedTags.has(config.tag)) {
+			error(`[Proton]: Cannot have more than one component with the same tag (tag: "${config.tag}")`, 2);
+		}
+		const runner = new ComponentRunner(config, componentClass);
+		componentClassToRunner.set(componentClass, runner);
+		if (config.tag !== undefined) {
+			usedTags.add(config.tag);
+		}
+	};
+}
+
 /**
  * Get a component attached to the given instance. Returns
  * `undefined` if nothing is found.
@@ -80,114 +215,34 @@ export function getComponent<I extends C["instance"], C extends BaseComponent>(
 	return componentClassToRunner.get(componentClass)?.getFromInstance(instance) as C | undefined;
 }
 
-class ComponentRunner {
-	private readonly compInstances = new Map<
-		Instance,
-		{ comp: BaseComponent; started: boolean; connections: RBXScriptConnection[] }
-	>();
-
-	constructor(config: ComponentConfig, componentClass: new () => BaseComponent) {
-		const addQueue = new Map<Instance, thread>();
-
-		const checkParent = (instance: Instance): boolean => {
-			if (config.blacklistDescendants !== undefined) {
-				for (const descendant of config.blacklistDescendants) {
-					if (instance.IsDescendantOf(descendant)) {
-						return false;
-					}
-				}
-			}
-			if (config.whitelistDescendants !== undefined) {
-				for (const descendant of config.whitelistDescendants) {
-					if (instance.IsDescendantOf(descendant)) {
-						return true;
-					}
-				}
-				return false;
-			}
-			return true;
-		};
-
-		const onInstanceAdded = (instance: Instance) => {
-			const comp = new componentClass();
-			comp.instance = instance;
-			comp.tag = config.tag;
-			const compItem = { comp, started: false, connections: new Array<RBXScriptConnection>() };
-			this.compInstances.set(instance, compItem);
-			if (checkParent(instance)) {
-				compItem.started = true;
-				task.spawn(() => comp.onStart());
-			}
-			if (config.whitelistDescendants !== undefined || config.blacklistDescendants !== undefined) {
-				const ancestryConnection = instance.AncestryChanged.Connect((_, parent) => {
-					if (parent === undefined) return;
-					if (checkParent(instance)) {
-						if (!compItem.started) {
-							compItem.started = true;
-							task.spawn(() => comp.onStart());
-						}
-					} else {
-						if (compItem.started) {
-							compItem.started = false;
-							task.spawn(() => comp.onStop());
-						}
-					}
-				});
-				compItem.connections.push(ancestryConnection);
-			}
-			addQueue.delete(instance);
-		};
-
-		const queueOnInstanceAdded = (instance: Instance) => {
-			if (addQueue.has(instance) || this.compInstances.has(instance)) return;
-			addQueue.set(instance, task.defer(onInstanceAdded, instance));
-		};
-
-		const onInstanceRemoved = (instance: Instance) => {
-			if (addQueue.has(instance)) {
-				task.cancel(addQueue.get(instance)!);
-				addQueue.delete(instance);
-			}
-			const compItem = this.compInstances.get(instance);
-			if (compItem !== undefined) {
-				this.compInstances.delete(instance);
-				if (compItem.started) {
-					task.spawn(() => compItem.comp.onStop());
-				}
-				for (const connection of compItem.connections) {
-					connection.Disconnect();
-				}
-			}
-		};
-
-		CollectionService.GetInstanceAddedSignal(config.tag).Connect(queueOnInstanceAdded);
-		CollectionService.GetInstanceRemovedSignal(config.tag).Connect(onInstanceRemoved);
-
-		for (const instance of CollectionService.GetTagged(config.tag)) {
-			task.spawn(queueOnInstanceAdded, instance);
-		}
+/**
+ * Add a component manually (bypass CollectionService).
+ * @param componentClass Component class
+ * @param instance Instance
+ */
+export function addComponent<I extends C["instance"], C extends BaseComponent>(
+	componentClass: new () => C,
+	instance: I,
+) {
+	const runner = componentClassToRunner.get(componentClass);
+	if (runner === undefined) {
+		error("[Proton]: Component class not set up");
 	}
-
-	getFromInstance(instance: Instance) {
-		const compItem = this.compInstances.get(instance);
-		if (compItem !== undefined && compItem.started) {
-			return compItem.comp;
-		}
-		return undefined;
-	}
+	runner.forceSpawn(instance);
 }
 
 /**
- * Component decorator.
- * @param config Component configuration
+ * Remove a component manually.
+ * @param componentClass Component class
+ * @param instance Instance
  */
-export function Component(config: ComponentConfig) {
-	return <B extends new () => BaseComponent>(componentClass: B) => {
-		if (usedTags.has(config.tag)) {
-			error(`[Proton]: Cannot have more than one component with the same tag (tag: "${config.tag}")`, 2);
-		}
-		const runner = new ComponentRunner(config, componentClass);
-		usedTags.add(config.tag);
-		componentClassToRunner.set(componentClass, runner);
-	};
+export function removeComponent<I extends C["instance"], C extends BaseComponent>(
+	componentClass: new () => C,
+	instance: I,
+) {
+	const runner = componentClassToRunner.get(componentClass);
+	if (runner === undefined) {
+		error("[Proton]: Component class not set up");
+	}
+	runner.forceDespawn(instance);
 }
