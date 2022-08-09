@@ -129,6 +129,7 @@ class ComponentRunner {
 			compItem.connections.push(ancestryConnection);
 		}
 		this.addQueue.delete(instance);
+		return comp;
 	}
 
 	private queueOnInstanceAdded(instance: Instance) {
@@ -168,7 +169,7 @@ class ComponentRunner {
 		if (this.config.tag !== undefined) {
 			error("[Proton]: Component with a configured tag cannot be spawned", 2);
 		}
-		this.queueOnInstanceAdded(instance);
+		return this.getFromInstance(instance) ?? this.onInstanceAdded(instance);
 	}
 
 	forceDespawn(instance: Instance) {
@@ -228,7 +229,7 @@ export function addComponent<I extends C["instance"], C extends BaseComponent>(
 	if (runner === undefined) {
 		error("[Proton]: Component class not set up");
 	}
-	runner.forceSpawn(instance);
+	return runner.forceSpawn(instance) as C;
 }
 
 /**
