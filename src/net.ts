@@ -33,10 +33,19 @@ export enum NetEventType {
 }
 
 interface INetEventClientFire<T extends unknown[] | unknown> {
+	/**
+	 * Fire the event to the server with the given arguments.
+	 * @param args Arguments
+	 */
 	fire(...args: NetworkParams<T>): void;
 }
 
 interface INetEventClientConnect<T extends unknown[] | unknown> {
+	/**
+	 * Listen to events coming from the server.
+	 * @param handler Handle the event
+	 * @returns RBXScriptConnection
+	 */
 	connect(handler: (...args: NetworkParams<T>) => void): RBXScriptConnection;
 }
 
@@ -50,11 +59,40 @@ type NetEventClientExposed<T extends unknown[] | unknown, B extends NetEventType
 	: INetEventClientFire<T>;
 
 interface INetEventServerFire<T extends unknown[] | unknown> {
+	/**
+	 * Fire the event to the given client(s) with the arguments.
+	 * @param player Client(s)
+	 * @param args Arguments
+	 */
 	fire(player: Player, ...args: NetworkParams<T>): void;
+
+	/**
+	 * Fire the event to all clients with the given arguments.
+	 * @param args Arguments
+	 */
 	fireAll(...args: NetworkParams<T>): void;
+
+	/**
+	 * Fire the event to all clients _except_ the given client(s).
+	 * @param exceptPlayer Client(s) to ignore
+	 * @param args Arguments
+	 */
+	fireExcept(exceptPlayer: Player | Player[], ...args: NetworkParams<T>): void;
+
+	/**
+	 * Fire the event to each client given the predicate for each client returns `true`.
+	 * @param predicate Predicate function to test if the event should be fired to the given client
+	 * @param args Arguments
+	 */
+	fireIf(predicate: (player: Player) => boolean, ...args: NetworkParams<T>): void;
 }
 
 interface INetEventServerConnect<T extends unknown[] | unknown> {
+	/**
+	 * Listen to events coming from all clients.
+	 * @param handler Handle the event
+	 * @returns RBXScriptConnection
+	 */
 	connect(handler: (player: Player, ...args: NetworkParams<T>) => void): RBXScriptConnection;
 }
 
@@ -133,19 +171,10 @@ function setupRemoteObject<T extends "RemoteEvent" | "RemoteFunction">(
 class NetEventClient<T extends unknown[] | unknown> implements INetEventClient<T> {
 	constructor(private readonly re: RemoteEvent) {}
 
-	/**
-	 * Fire the event to the server with the given arguments.
-	 * @param args Arguments
-	 */
 	public fire(...args: NetworkParams<T>) {
 		this.re.FireServer(...args);
 	}
 
-	/**
-	 * Listen to events coming from the server.
-	 * @param handler Handle the event
-	 * @returns RBXScriptConnection
-	 */
 	public connect(handler: (...args: NetworkParams<T>) => void): RBXScriptConnection {
 		return this.re.OnClientEvent.Connect(handler);
 	}
@@ -154,19 +183,10 @@ class NetEventClient<T extends unknown[] | unknown> implements INetEventClient<T
 class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T> {
 	constructor(private readonly re: RemoteEvent) {}
 
-	/**
-	 * Fire the event to all clients with the given arguments.
-	 * @param args Arguments
-	 */
 	public fireAll(...args: NetworkParams<T>) {
 		this.re.FireAllClients(...args);
 	}
 
-	/**
-	 * Fire the event to the given client(s) with the arguments.
-	 * @param player Client(s)
-	 * @param args Arguments
-	 */
 	public fire(player: Player | Player[], ...args: NetworkParams<T>) {
 		if (typeOf(player) === "table") {
 			for (const plr of player as Player[]) {
@@ -177,11 +197,6 @@ class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T
 		}
 	}
 
-	/**
-	 * Fire the event to all clients _except_ the given client(s).
-	 * @param exceptPlayer Client(s) to ignore
-	 * @param args Arguments
-	 */
 	public fireExcept(exceptPlayer: Player | Player[], ...args: NetworkParams<T>) {
 		if (typeOf(exceptPlayer) === "table") {
 			for (const player of Players.GetPlayers()) {
@@ -196,11 +211,6 @@ class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T
 		}
 	}
 
-	/**
-	 * Fire the event to each client given the predicate for each client returns `true`.
-	 * @param predicate Predicate function to test if the event should be fired to the given client
-	 * @param args Arguments
-	 */
 	public fireIf(predicate: (player: Player) => boolean, ...args: NetworkParams<T>) {
 		for (const player of Players.GetPlayers()) {
 			if (!predicate(player)) continue;
@@ -208,11 +218,6 @@ class NetEventServer<T extends unknown[] | unknown> implements INetEventServer<T
 		}
 	}
 
-	/**
-	 * Listen to events coming from all clients.
-	 * @param handler Handle the event
-	 * @returns RBXScriptConnection
-	 */
 	public connect(handler: (player: Player, ...args: NetworkParams<T>) => void): RBXScriptConnection {
 		return this.re.OnServerEvent.Connect(handler as (player: Player, ...args: unknown[]) => void);
 	}
