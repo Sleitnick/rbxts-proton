@@ -36,9 +36,28 @@ const componentClassToRunner = new Map<new () => BaseComponent, ComponentRunner>
  * ```
  */
 export abstract class BaseComponent<T extends Instance = Instance> {
+	/**
+	 * Attached instance.
+	 */
 	public instance!: T;
+
+	/**
+	 * CollectionService tag.
+	 */
 	public tag!: string;
+
+	/**
+	 * Called when the instance is started. This can be called multiple
+	 * times within the lifetime of the class instance. However, it is
+	 * guaranteed that `onStop()` will be called in-between calls.
+	 */
 	abstract onStart(): void;
+
+	/**
+	 * Called when the instance is stopped. This can be called multiple
+	 * times within the lifetime of the class instance. Therefore, it is
+	 * important that this method is idempotent.
+	 */
 	abstract onStop(): void;
 }
 
