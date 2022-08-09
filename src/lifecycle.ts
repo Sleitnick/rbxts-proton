@@ -1,3 +1,5 @@
+import { Proton, ProtonStart, Provider } from "./core";
+
 type LifecycleCallback<T> = (...args: Parameters<T>) => void;
 
 /**
@@ -143,13 +145,16 @@ export class ProtonLifecycle<T extends LifecycleCallback<T>> {
  */
 export function Lifecycle<T extends LifecycleCallback<T>>(lifecycle: ProtonLifecycle<T>) {
 	return (
-		target: InferThis<(this: defined, ...args: Parameters<T>) => void>,
+		target: defined,
 		property: string,
 		descriptor: TypedPropertyDescriptor<(this: defined, ...args: Parameters<T>) => void>,
 	) => {
+		if (Proton.get(target as new () => never) === undefined) {
+			error("[Proton]: Lifecycles can only be attached to providers", 2);
+		}
 		lifecycle.register(
 			((...args: Parameters<T>) => {
-				descriptor.value(target, ...args);
+				descriptor.value(Proton.get(target as new () => never), ...args);
 			}) as T,
 			tostring(target),
 		);
