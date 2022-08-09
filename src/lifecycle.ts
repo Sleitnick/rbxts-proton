@@ -149,9 +149,6 @@ export function Lifecycle<T extends LifecycleCallback<T>>(lifecycle: ProtonLifec
 		property: string,
 		descriptor: TypedPropertyDescriptor<(this: defined, ...args: Parameters<T>) => void>,
 	) => {
-		if (Proton.get(target as new () => never) === undefined) {
-			error("[Proton]: Lifecycles can only be attached to providers", 2);
-		}
 		lifecycle.register(
 			((...args: Parameters<T>) => {
 				descriptor.value(Proton.get(target as new () => never), ...args);
