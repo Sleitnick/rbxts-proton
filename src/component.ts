@@ -35,11 +35,11 @@ const componentClassToRunner = new Map<new () => BaseComponent, ComponentRunner>
  * }
  * ```
  */
-export abstract class BaseComponent<T extends Instance = Instance> {
+export abstract class BaseComponent<I extends Instance = Instance> {
 	/**
 	 * Attached instance.
 	 */
-	public instance!: T;
+	public instance!: I;
 
 	/**
 	 * CollectionService tag.
@@ -119,7 +119,7 @@ class ComponentRunner {
 				task.spawn(() => comp.onStart());
 			}
 			if (config.whitelistDescendants !== undefined || config.blacklistDescendants !== undefined) {
-				const connection = instance.AncestryChanged.Connect((_, parent) => {
+				const ancestryConnection = instance.AncestryChanged.Connect((_, parent) => {
 					if (parent === undefined) return;
 					if (checkParent(instance)) {
 						if (!compItem.started) {
@@ -133,7 +133,7 @@ class ComponentRunner {
 						}
 					}
 				});
-				compItem.connections.push(connection);
+				compItem.connections.push(ancestryConnection);
 			}
 			addQueue.delete(instance);
 		};
@@ -182,7 +182,7 @@ class ComponentRunner {
  * @param config Component configuration
  */
 export function Component(config: ComponentConfig) {
-	return <T extends new () => BaseComponent>(componentClass: T) => {
+	return <B extends new () => BaseComponent>(componentClass: B) => {
 		if (usedTags.has(config.tag)) {
 			error(`[Proton]: Cannot have more than one component with the same tag (tag: "${config.tag}")`, 2);
 		}
