@@ -1,3 +1,4 @@
+import { Signal } from "@rbxts/beacon";
 import { CollectionService } from "@rbxts/services";
 
 export interface ComponentConfig {
@@ -68,6 +69,9 @@ class ComponentRunner {
 	>();
 	private readonly addQueue = new Map<Instance, thread>();
 
+	public componentStarted = new Signal<[component: BaseComponent]>();
+	public componentStopped = new Signal<[component: BaseComponent]>();
+
 	constructor(private readonly config: ComponentConfig, private readonly componentClass: new () => BaseComponent) {
 		if (config.tag !== undefined) {
 			CollectionService.GetInstanceAddedSignal(config.tag).Connect((instance) =>
@@ -110,6 +114,7 @@ class ComponentRunner {
 		if (this.checkParent(instance)) {
 			compItem.started = true;
 			task.spawn(() => comp.onStart());
+			this.componentStarted.Fire(comp);
 		}
 		if (this.config.whitelistDescendants !== undefined || this.config.blacklistDescendants !== undefined) {
 			const ancestryConnection = instance.AncestryChanged.Connect((_, parent) => {
@@ -118,11 +123,13 @@ class ComponentRunner {
 					if (!compItem.started) {
 						compItem.started = true;
 						task.spawn(() => comp.onStart());
+						this.componentStarted.Fire(comp);
 					}
 				} else {
 					if (compItem.started) {
 						compItem.started = false;
 						task.spawn(() => comp.onStop());
+						this.componentStopped.Fire(comp);
 					}
 				}
 			});
@@ -150,6 +157,7 @@ class ComponentRunner {
 			this.compInstances.delete(instance);
 			if (compItem.started) {
 				task.spawn(() => compItem.comp.onStop());
+				this.componentStopped.Fire(compItem.comp);
 			}
 			for (const connection of compItem.connections) {
 				connection.Disconnect();
@@ -224,8 +232,55 @@ export function getComponent<I extends C["instance"], C extends BaseComponent>(
 	return componentClassToRunner.get(componentClass)?.getFromInstance(instance) as C | undefined;
 }
 
+/**
+ * Get all component instances for a given component class.
+ * @param componentClass Component class
+ * @returns Component instances
+ */
 export function getAllComponents<C extends BaseComponent>(componentClass: new () => C) {
-	return (componentClassToRunner.get(componentClass)?.getAll() ?? []) as C[];
+	const runner = componentClassToRunner.get(componentClass);
+	if (runner === undefined) {
+		error("[Proton]: Invalid component class", 2);
+	}
+	return runner.getAll() as C[];
+}
+
+/**
+ * Get a signal for the given component class that will be fired any time
+ * a new component instance for the given class is started.
+ *
+ * ```ts
+ * getComponentStartedSignal(MyComponent).Connect((myComponent) => {});
+ * ```
+ *
+ * @param componentClass Component class
+ * @returns Signal
+ */
+export function getComponentStartedSignal<C extends BaseComponent>(componentClass: new () => C) {
+	const runner = componentClassToRunner.get(componentClass);
+	if (runner === undefined) {
+		error("[Proton]: Invalid component class", 2);
+	}
+	return runner.componentStarted as Signal<[component: C]>;
+}
+
+/**
+ * Get a signal for the given component class that will be fired any time
+ * a new component instance for the given class is stopped.
+ *
+ * ```ts
+ * getComponentStoppedSignal(MyComponent).Connect((myComponent) => {});
+ * ```
+ *
+ * @param componentClass Component class
+ * @returns Signal
+ */
+export function getComponentStoppedSignal<C extends BaseComponent>(componentClass: new () => C) {
+	const runner = componentClassToRunner.get(componentClass);
+	if (runner === undefined) {
+		error("[Proton]: Invalid component class", 2);
+	}
+	return runner.componentStopped as Signal<[component: C]>;
 }
 
 /**
