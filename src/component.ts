@@ -284,6 +284,69 @@ export function getComponentStoppedSignal<C extends BaseComponent>(componentClas
 }
 
 /**
+ * Observe each component instance during its lifetime. The `observer` function
+ * will be called for each component instance that starts. The observer should
+ * return a cleanup function, which will then be called when the component stops.
+ *
+ * A root cleanup function is returned from this function too, which will stop
+ * all observations and call all current cleanup functions from your observer.
+ *
+ * ```ts
+ * const stopObserving = observeComponent(MyComponent, (myComponent) => {
+ * 	print("myComponent instance started");
+ * 	return () => {
+ * 		print("myComponent instance stopped");
+ * 	};
+ * });
+ *
+ * // If observations should stop, call the returned cleanup function:
+ * stopObserving();
+ * ```
+ *
+ * @param componentClass Component class
+ * @param observer Observer function
+ * @returns Root cleanup
+ */
+export function observeComponent<C extends BaseComponent>(
+	componentClass: new () => C,
+	observer: (component: C) => () => void,
+) {
+	const runner = componentClassToRunner.get(componentClass);
+	if (runner === undefined) {
+		error("[Proton]: Invalid component class", 2);
+	}
+
+	const cleanups = new Map<BaseComponent, () => void>();
+
+	const onStopped = (component: BaseComponent) => {
+		const cleanup = cleanups.get(component);
+		if (cleanup === undefined) return;
+		cleanups.delete(component);
+		cleanup();
+	};
+
+	const onStarted = (component: BaseComponent) => {
+		onStopped(component);
+		const cleanup = observer(component as C);
+		cleanups.set(component, cleanup);
+	};
+
+	const startedConnection = runner.componentStarted.Connect(onStarted);
+	const stoppedConnection = runner.componentStopped.Connect(onStopped);
+	for (const component of runner.getAll()) {
+		task.spawn(onStarted, component);
+	}
+
+	return () => {
+		startedConnection.Disconnect();
+		stoppedConnection.Disconnect();
+		for (const [_, cleanup] of cleanups) {
+			task.spawn(cleanup);
+		}
+	};
+}
+
+/**
  * Add a component manually (bypass CollectionService).
  * @param componentClass Component class
  * @param instance Instance
