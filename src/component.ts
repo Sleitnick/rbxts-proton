@@ -165,6 +165,14 @@ class ComponentRunner {
 		return undefined;
 	}
 
+	getAll() {
+		const all = [];
+		for (const [_, compItem] of this.compInstances) {
+			all.push(compItem.comp);
+		}
+		return all;
+	}
+
 	forceSpawn(instance: Instance) {
 		if (this.config.tag !== undefined) {
 			error("[Proton]: Component with a configured tag cannot be spawned", 2);
@@ -214,6 +222,10 @@ export function getComponent<I extends C["instance"], C extends BaseComponent>(
 	instance: I,
 ) {
 	return componentClassToRunner.get(componentClass)?.getFromInstance(instance) as C | undefined;
+}
+
+export function getAllComponents<C extends BaseComponent>(componentClass: new () => C) {
+	return (componentClassToRunner.get(componentClass)?.getAll() ?? []) as C[];
 }
 
 /**
