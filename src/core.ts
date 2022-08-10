@@ -1,4 +1,4 @@
-const providerClasses = new Map<new () => unknown, unknown>();
+const PROVIDER_KEY = "__proton_provider__";
 
 let started = false;
 const awaitStartThreads: thread[] = [];
@@ -12,7 +12,7 @@ export function Provider() {
 		if (started) {
 			error("[Proton]: Cannot create provider after Proton has started", 2);
 		}
-		providerClasses.set(providerClass, new providerClass());
+		(providerClass as Record<string, unknown>)[PROVIDER_KEY] = new providerClass();
 	};
 }
 
@@ -40,6 +40,7 @@ export namespace Proton {
 		for (const awaitThread of awaitStartThreads) {
 			task.spawn(awaitThread);
 		}
+		awaitCallbacks.clear();
 		awaitStartThreads.clear();
 	}
 
@@ -95,7 +96,7 @@ export namespace Proton {
 	 * @returns The provider singleton object
 	 */
 	export function get<T extends new () => InstanceType<T>>(providerClass: T): InstanceType<T> {
-		const provider = providerClasses.get(providerClass) as InstanceType<T>;
+		const provider = (providerClass as Record<string, unknown>)[PROVIDER_KEY] as InstanceType<T> | undefined;
 		if (provider === undefined) {
 			error(`[Proton]: Failed to find provider "${tostring(providerClass)}"`, 2);
 		}
