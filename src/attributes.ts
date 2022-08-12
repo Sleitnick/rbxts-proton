@@ -24,40 +24,45 @@ export class Attributes<T extends AttributeRecord<string, AttributeValue>, I ext
 	 * the `set()` method.
 	 */
 	public readonly attributes: Readonly<T>;
+	private readonly attr: { [key: string]: AttributeValue | undefined } = {};
 
 	private readonly connections: RBXScriptConnection[] = [];
 	private readonly onChangedCallbacks = new Map<keyof T, ((newValue: never, oldValue: never) => void)[]>();
 
 	constructor(private readonly instance: I, defaultAttributes: T) {
-		const attr: { [key: string]: AttributeValue | undefined } = {};
 		const attrBound = instance.GetAttributes();
 		for (const [k, v] of pairs(defaultAttributes)) {
 			const key = k as string;
 			const val = v as AttributeValue;
 			const bound = attrBound.get(key);
 			if (bound !== undefined) {
-				attr[key] = bound;
+				this.attr[key] = bound;
 			} else {
-				attr[key] = val;
+				this.attr[key] = val;
 				instance.SetAttribute(key, val);
 			}
 			const connection = instance.GetAttributeChangedSignal(key).Connect(() => {
-				const oldValue = attr[key];
-				const newValue = instance.GetAttribute(key);
-				attr[key] = newValue;
-				const callbacks = this.onChangedCallbacks.get(key);
-				if (callbacks) {
-					for (const callback of callbacks as ((
-						newVal: AttributeValue | undefined,
-						oldVal: AttributeValue | undefined,
-					) => void)[]) {
-						task.spawn(callback, newValue, oldValue);
-					}
-				}
+				this.handleOnChange(key, instance.GetAttribute(key));
 			});
 			this.connections.push(connection);
 		}
-		this.attributes = attr as T;
+		this.attributes = this.attr as T;
+	}
+
+	private handleOnChange(key: string, newValue: AttributeValue | undefined): boolean {
+		const oldValue = this.attr[key];
+		if (newValue === oldValue) return false;
+		this.attr[key] = newValue;
+		const callbacks = this.onChangedCallbacks.get(key);
+		if (callbacks) {
+			for (const callback of callbacks as ((
+				newVal: AttributeValue | undefined,
+				oldVal: AttributeValue | undefined,
+			) => void)[]) {
+				task.spawn(callback, newValue, oldValue);
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -71,6 +76,8 @@ export class Attributes<T extends AttributeRecord<string, AttributeValue>, I ext
 	 * @param value Attribute value
 	 */
 	public set<K extends keyof T>(key: K, value: T[K]): void {
+		const changed = this.handleOnChange(key as string, value);
+		if (!changed) return;
 		this.instance.SetAttribute(key as string, value);
 	}
 
