@@ -248,3 +248,28 @@ export class MyProvider {
 	onPlayerAdded(player: Player) {}
 }
 ```
+
+
+## Components
+
+Bind components to Roblox instances using the Component class and CollectionService tags.
+
+```ts
+import { BaseComponent, Component } from "@rbxts/proton";
+
+@Component({ tag: "MyComponent" })
+class MyComponent extends BaseComponent<BasePart> {
+	onStart() {}
+	onStop() {}
+}
+```
+
+In initialization file:
+
+```ts
+import { Proton } from "@rbxts/proton";
+
+import "./wherever/my-component";
+
+Proton.start();
+```
