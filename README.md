@@ -186,7 +186,7 @@ export interface OnHeartbeat {
 
 export const HeartbeatLifecycle = new ProtonLifecycle<OnHeartbeat["onHeartbeat"]>();
 
-RunService.Heartbeat.Connect((dt) => heartbeat.fire(dt));
+RunService.Heartbeat.Connect((dt) => HeartbeatLifecycle.fire(dt));
 ```
 
 A provider can then hook into the lifecycle:
