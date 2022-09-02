@@ -242,7 +242,7 @@ Having the `OnPlayerAdded` interface just helps to keep explicit typings across 
 ```ts
 export const PlayerAddedLifecycle = new ProtonLifecycle<(player: Player) => void>();
 
-@Provider
+@Provider()
 export class MyProvider {
 	@Lifecycle(PlayerAddedLifecycle)
 	onPlayerAdded(player: Player) {}
