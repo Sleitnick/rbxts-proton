@@ -214,13 +214,13 @@ export interface OnPlayerAdded {
 export const PlayerAddedLifecycle = new ProtonLifecycle<OnPlayerAdded["onPlayerAdded"]>();
 
 // Trigger lifecycle for all current players and all future players:
-Players.PlayerAdded.Connect((player) => playerAdded.fire(player));
+Players.PlayerAdded.Connect((player) => PlayerAddedLifecycle.fire(player));
 for (const player of Players.GetPlayers()) {
-	playerAdded.fire(player);
+	PlayerAddedLifecycle.fire(player);
 }
 
 // Trigger lifecycle for all players for any new callbacks that get registered later on during runtime:
-playerAdded.onRegistered((callback) => {
+PlayerAddedLifecycle.onRegistered((callback) => {
 	for (const player of Players.GetPlayers()) {
 		task.spawn(callback, player);
 	}
