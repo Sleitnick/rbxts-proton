@@ -35,15 +35,13 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 18
       - name: Install dependencies
         run: npm ci
       - name: Publish project
         run: npm publish
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # - name: Build for archive
-      #   run: npm run build
       - name: Create archive
         shell: bash
         run: |

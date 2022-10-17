@@ -136,7 +136,7 @@ export namespace Network {
 	export const buy = new NetFunction<[item: string, category: string], [bought: boolean]>();
 
 	// Client gets sent multiple variables
-	export const getMultiple = new NetFunction<void, [msg1: string, msg2: string, msg3: string]>();
+	export const getMultiple = new NetFunction<void, {msg1: string, msg2: string, msg3: string}>();
 }
 ```
 
@@ -157,7 +157,7 @@ Network.buy.server.handle((player, item, category) => {
 	return false;
 });
 Network.getMultiple.handle((player) => {
-	return ["hello", "world", "how are you"] as LuaTuple<[string, string, string]>;
+	return { msg1: "hello", msg2: "world", msg3: "how are you" };
 });
 ```
 
@@ -169,7 +169,7 @@ Network.sendMessageToPlayer.client.connect((message) => {
 });
 Network.fireBullet.client.fire(new Vector3(), Vector3.zAxis);
 const data = Network.getData.client.fire();
-const [msg1, msg2, msg3] = Network.getMultiple.client.fire();
+const { msg1, msg2, msg3 } = Network.getMultiple.client.fire();
 ```
 
 ## Lifecycles

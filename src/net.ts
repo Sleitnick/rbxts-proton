@@ -10,7 +10,7 @@ type NetworkParams<T> = Parameters<
 		: () => void
 >;
 
-type NetworkReturn<T> = T extends [infer A] ? A : T extends unknown[] ? LuaTuple<T> : T;
+type NetworkReturn<T> = T extends [infer A] ? A : T;
 
 /**
  * NetEvent type.
