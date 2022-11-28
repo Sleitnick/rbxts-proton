@@ -7,6 +7,9 @@ Proton is an easy-to-use framework for Roblox game development.
 
 Like the proton of an atom, Proton aims at adding stability to your game development, all while only remaining a portion of the whole. Use Proton to structure and connect the top-level design of your game.
 
+> **Warning**
+> Proton is early in development. Due to currently limitations with roblox-ts, Proton does not yet support dependency injection, which is a necessary feature to make Proton production-ready. Other portions of Proton may also change, as the overall API is not solidified.
+
 ## Providers
 
 Providers are the core of Proton. A provider _provides_ a specific service or utility to your game. For example, a game might have a `DataProvider` (or `DataService`/`DataManager`/etc.) that provides the logic for handling data for players in the game.
