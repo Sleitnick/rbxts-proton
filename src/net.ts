@@ -233,11 +233,29 @@ class NetFunctionServer<TX extends unknown[] | unknown, RX extends unknown[] | u
 	public handle(handler: (player: Player, ...args: NetworkParams<TX>) => NetworkReturn<RX>) {
 		this.rf.OnServerInvoke = handler as (player: Player, ...args: unknown[]) => NetworkReturn<RX>;
 	}
+
+	/**
+	 * Invoke the remote function, sending the arguments to the client.
+	 * @param player Player
+	 * @param args TX
+	 * @returns RX
+	 */
+	public async invoke(player: Player, ...args: NetworkParams<TX>): Promise<NetworkReturn<RX>> {
+		return this.rf.InvokeClient(player, ...args);
+	}
 }
 
 class NetFunctionClient<TX extends unknown[] | unknown, RX extends unknown[] | unknown> {
 	constructor(private readonly rf: RemoteFunction) {}
 
+	/**
+	 * Handle invocations to this remote function coming from the server.
+	 * @param handler Handler
+	 * @returns void
+	 */
+	public handle(handler: (...args: NetworkParams<TX>) => NetworkReturn<RX>) {
+		this.rf.OnClientInvoke = handler as (...args: unknown[]) => NetworkReturn<RX>;
+	}
 	/**
 	 * Invoke the remote function, sending the arguments to the server.
 	 * @param args TX
